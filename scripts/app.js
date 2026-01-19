@@ -14,15 +14,46 @@ const closeArticleBtn = document.getElementById('close-article');
 const viewButtons = document.querySelectorAll('.view-btn');
 const currentCategoryTitle = document.getElementById('current-category-title');
 
+// Settings Modal Elements
+const settingsBtn = document.getElementById('settings-btn');
+const settingsOverlay = document.getElementById('settings-overlay');
+const closeSettingsBtn = document.getElementById('close-settings');
+const saveSettingsBtn = document.getElementById('save-settings');
+const categoryPreferences = document.getElementById('category-preferences');
+
 // State
 let articles = [];
 let currentCategory = 'all';
 let currentView = 'comfortable';
 let searchQuery = '';
 let isLoading = false;
+let enabledCategories = ['technology', 'science', 'business', 'health', 'world'];
+
+// Load category preferences from localStorage
+function loadCategoryPreferences() {
+    const saved = localStorage.getItem('clearfeed_categories');
+    if (saved) {
+        enabledCategories = JSON.parse(saved);
+        // Update checkboxes to match saved state
+        const checkboxes = categoryPreferences.querySelectorAll('input[type="checkbox"]');
+        checkboxes.forEach(cb => {
+            cb.checked = enabledCategories.includes(cb.value);
+        });
+    }
+}
+
+// Save category preferences to localStorage
+function saveCategoryPreferences() {
+    const checkboxes = categoryPreferences.querySelectorAll('input[type="checkbox"]');
+    enabledCategories = Array.from(checkboxes)
+        .filter(cb => cb.checked)
+        .map(cb => cb.value);
+    localStorage.setItem('clearfeed_categories', JSON.stringify(enabledCategories));
+}
 
 // Initialize
 async function init() {
+    loadCategoryPreferences();
     setupEventListeners();
     loadTheme();
     await loadArticles();
@@ -96,14 +127,17 @@ function updateCategoryCounts() {
 }
 
 // Filter articles
+// Filter articles by category, search, and user preferences
 function getFilteredArticles() {
     return articles.filter(article => {
+        // Filter by enabled categories (user preferences)
+        const categoryEnabled = enabledCategories.includes(article.category);
         const matchesCategory = currentCategory === 'all' || article.category === currentCategory;
         const matchesSearch = searchQuery === '' ||
             article.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
             article.excerpt.toLowerCase().includes(searchQuery.toLowerCase()) ||
             article.source.toLowerCase().includes(searchQuery.toLowerCase());
-        return matchesCategory && matchesSearch;
+        return categoryEnabled && matchesCategory && matchesSearch;
     });
 }
 
@@ -328,6 +362,31 @@ function setupEventListeners() {
             currentView = btn.dataset.view;
             feedContainer.classList.toggle('compact', currentView === 'compact');
         });
+    });
+
+    // Settings modal
+    settingsBtn.addEventListener('click', () => {
+        settingsOverlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    });
+
+    closeSettingsBtn.addEventListener('click', () => {
+        settingsOverlay.classList.remove('active');
+        document.body.style.overflow = '';
+    });
+
+    settingsOverlay.addEventListener('click', (e) => {
+        if (e.target === settingsOverlay) {
+            settingsOverlay.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+    });
+
+    saveSettingsBtn.addEventListener('click', () => {
+        saveCategoryPreferences();
+        settingsOverlay.classList.remove('active');
+        document.body.style.overflow = '';
+        renderArticles(); // Re-render with new preferences
     });
 }
 

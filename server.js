@@ -52,6 +52,32 @@ function timeAgo(date) {
     return `${Math.floor(seconds / 86400)} days ago`;
 }
 
+// Helper: Sanitize content - remove URLs, metadata patterns (Hacker News fix)
+function sanitizeContent(content, title) {
+    if (!content) return title || '';
+
+    let cleaned = content
+        // Remove URLs
+        .replace(/https?:\/\/[^\s]+/gi, '')
+        // Remove "Article URL:" patterns
+        .replace(/Article URL:\s*/gi, '')
+        .replace(/Comments URL:\s*/gi, '')
+        // Remove "Points: X # Comments: Y" patterns
+        .replace(/Points:\s*\d+\s*#?\s*Comments:\s*\d+/gi, '')
+        // Remove standalone metadata
+        .replace(/id=\d+/gi, '')
+        // Clean up multiple spaces and newlines
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    // If content is now too short or empty, use title
+    if (cleaned.length < 30) {
+        return title || cleaned;
+    }
+
+    return cleaned;
+}
+
 // AI Content Processing with Groq - Cleans headlines and removes bias
 async function processWithAI(originalTitle, originalContent) {
     if (!originalContent || originalContent.length < 50) {
@@ -155,13 +181,16 @@ async function fetchFeed(feedConfig, category) {
             const rawContent = stripHtml(item.content || item.contentSnippet || item.description || '');
             const originalTitle = item.title || 'Untitled';
 
+            // Sanitize content - remove URLs and metadata (HN fix)
+            const cleanContent = sanitizeContent(rawContent, originalTitle);
+
             // Add delay between API calls to avoid rate limiting (1 second)
             if (index > 0) {
                 await new Promise(resolve => setTimeout(resolve, 1000));
             }
 
             // Get AI cleaned content
-            const aiResult = await processWithAI(originalTitle, rawContent);
+            const aiResult = await processWithAI(originalTitle, cleanContent);
 
             articles.push({
                 id: `${category}-${feedConfig.name}-${index}`,
